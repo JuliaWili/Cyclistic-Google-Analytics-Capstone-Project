@@ -87,20 +87,55 @@ FROM [Cyclistic].[dbo].[Combined_Table]
 GROUP BY rideable_type;
 ```
 
-The query yieled following result:
+The query yielded following result:
 
 | rideable_type | ride_count | 
 |--------|-----------|
 | electric_bike | 3 678 925 | 
 | classic_bike | 1 941 619|
 
-Next, I checked start_station_name column and how many rides started at each station. The query revealed that 1 194 952 rides do not start at any particular station and their value in start_station_name is NULL. 
+Next, I checked start_station_name column and how many rides started at each station. The query revealed that 1 194 952 rides appear to not start at any particular station and their value in start_station_name is NULL. 
 
 ```sql
 SELECT start_station_name, count(*) as ride_count 
 FROM [Cyclistic].[dbo].[Combined_Table]
 GROUP BY start_station_name;
 ```
+To further investigate the NULL values I checked whether they are related to the type of user or type of bike.
+
+```sql
+SELECT
+	member_casual,
+	rideable_type,
+	COUNT(*) AS null_values_count
+FROM [Cyclistic].[dbo].[Combined_Table]
+WHERE start_station_name IS NULL
+GROUP BY member_casual, rideable_type;
+```
+The results were as follows:
+
+| member_casual | rideable_type | null_values_count | 
+|--------|-----------|--------------|
+| member | electric_bike | 710 591 |
+| casual | electric_bike | 376 626 |
+
+Only trips by electric_bikes appear to have not stared at specified stations. To see if the that is the case, or if some stations do not have a name in the database, I run the query below:
+
+```sql
+SELECT
+	start_station_id,
+	COUNT(*) AS rides,
+	SUM(CASE WHEN start_station_name IS NULL THEN 1 ELSE 0 END) AS null_count
+FROM [Cyclistic].[dbo].[Combined_Table]
+GROUP BY start_station_id
+ORDER BY null_count DESC;
+```
+
+All rides with NULL start_station_name also have NULL values in start_station_id, thus I confirmed that there are no valid starting staions without a valid name in the database. This also confirms that most likely, the trips with NULL starting station have started in another places which are not recognised as valid stations. The previous user of the bike must have not left the bike in the proper docking station. That means that even tough the trip did not start at a specific station, the trip itself is still valid, so there is no need to delete these rides from the database.
+
+To make sure that these rows are valid, I checked whether they have coordinates. Their lack would indicate some mistake in the system, and would in turn make the trip invalid for the purpose of the analysis.
+
+
 
 
 
